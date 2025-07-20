@@ -27,3 +27,9 @@ DEFAULT_HOST_PORT: int = 18812
 SETTING_AUTOSTART: str = "serviceStartOnLoad"
 SETTING_RPYC_HOST: str = "serviceRpycListenHost"
 SETTING_RPYC_PORT: str = "serviceRpycListenPort"
+SETTING_RPYC_TIMEOUT: str = "serviceRpycTimeout"
+
+"""
+Default timeout in seconds for synchronous RPyC requests
+"""
+DEFAULT_TIMEOUT: int = 3600

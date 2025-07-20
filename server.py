@@ -19,10 +19,12 @@ from .helpers import (
 from .constants import (
     DEFAULT_HOST_IP,
     DEFAULT_HOST_PORT,
+    DEFAULT_TIMEOUT,
     SERVICE_NAME,
     SETTING_AUTOSTART,
     SETTING_RPYC_HOST,
     SETTING_RPYC_PORT,
+    SETTING_RPYC_TIMEOUT,
 )
 
 if TYPE_CHECKING:
@@ -39,6 +41,7 @@ def register_settings() -> None:
         SETTING_AUTOSTART: f"""{{ "title" : "Auto Start", "description" : "Automatically start {SERVICE_NAME} when Binary Ninja opens", "type" : "boolean", "default" : false, "ignore" : ["SettingsProjectScope", "SettingsResourceScope"]}}""",
         SETTING_RPYC_HOST: f"""{{ "title" : "TCP Listen Host", "description" : "Interface {SERVICE_NAME} should listen", "type" : "string", "default" : "{DEFAULT_HOST_IP}", "ignore" : ["SettingsProjectScope", "SettingsResourceScope"]}}""",
         SETTING_RPYC_PORT: f"""{{ "title" : "TCP Listen Port", "description" : "TCP port {SERVICE_NAME} should listen", "type" : "number", "minValue": 1, "maxValue": 65535,  "default" : {DEFAULT_HOST_PORT}, "ignore" : ["SettingsProjectScope", "SettingsResourceScope"]}}""",
+        SETTING_RPYC_TIMEOUT: f"""{{ "title" : "Request Timeout (seconds)", "description" : "Timeout for synchronous RPyC requests in seconds", "type" : "number", "minValue": 30, "maxValue": 86400,  "default" : {DEFAULT_TIMEOUT}, "ignore" : ["SettingsProjectScope", "SettingsResourceScope"]}}""",
     }
 
     settings = binaryninja.Settings()
@@ -84,7 +87,7 @@ def is_service_started():
     return g_ServiceThread is not None
 
 
-def start_service(host: str, port: int, bv: binaryninja.binaryview.BinaryView) -> None:
+def start_service(host: str, port: int, timeout: int, bv: binaryninja.binaryview.BinaryView) -> None:
     """Starting the RPyC server"""
     global g_Server, __bv
     g_Server = None
@@ -105,6 +108,7 @@ def start_service(host: str, port: int, bv: binaryninja.binaryview.BinaryView) -
                     "allow_getattr": True,
                     "allow_setattr": True,
                     "allow_delattr": True,
+                    "sync_request_timeout": timeout,
                 },
             )
             break
@@ -127,8 +131,9 @@ def rpyc_start(bv: Optional[binaryninja.binaryview.BinaryView] = None) -> None:
     settings = binaryninja.Settings()
     host: str = settings.get_string(f"{SERVICE_NAME}.{SETTING_RPYC_HOST}")
     port: int = settings.get_integer(f"{SERVICE_NAME}.{SETTING_RPYC_PORT}")
+    timeout: int = settings.get_integer(f"{SERVICE_NAME}.{SETTING_RPYC_TIMEOUT}")
 
-    g_ServiceThread = threading.Thread(target=start_service, args=(host, port, bv))
+    g_ServiceThread = threading.Thread(target=start_service, args=(host, port, timeout, bv))
     g_ServiceThread.daemon = True
     g_ServiceThread.start()
     info(f"{SERVICE_NAME} successfully started in background")
