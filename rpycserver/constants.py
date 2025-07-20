@@ -2,7 +2,7 @@
 The service name
 """
 
-SERVICE_NAME: str = "Binja-RPyC"
+SERVICE_NAME: str = "binja_rpyc"
 
 """
 Service description
