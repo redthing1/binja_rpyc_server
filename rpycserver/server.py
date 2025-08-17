@@ -1,5 +1,6 @@
 """ """
 
+import sys
 import threading
 import importlib
 import rpyc
@@ -31,8 +32,8 @@ if TYPE_CHECKING:
     import rpyc.core.protocol
 
 
-g_ServiceThread: Optional[threading.Thread] = None
-g_Server: Optional[rpyc.utils.server.ThreadedServer] = None
+G_SERVICETHREAD: Optional[threading.Thread] = None
+G_SERVER: Optional[rpyc.utils.server.ThreadedServer] = None
 __bv: Optional["binaryninja.binaryview.BinaryView"] = None
 
 
@@ -77,21 +78,25 @@ class BinjaRpycService(rpyc.Service):
 
     def exposed_eval(self, cmd):
         return eval(cmd)
-    
+
     def exposed_import_module(self, mod):
         return importlib.import_module(mod)
 
+    def exposed_add_to_syspath(self, path):
+        return sys.path.append(path)
+
 
 def is_service_started():
-    global g_ServiceThread
-    dbg(f"checking is_service_started, g_ServiceThread: {g_ServiceThread}")
-    return g_ServiceThread is not None
+    global G_SERVICETHREAD
+    dbg(f"is_service_started: checking g_servicethread={G_SERVICETHREAD}")
+    return G_SERVICETHREAD is not None
 
 
-def start_service(host: str, port: int, timeout: int, bv: binaryninja.binaryview.BinaryView) -> None:
-    """Starting the RPyC server"""
-    global g_Server, __bv
-    g_Server = None
+def start_service(
+    host: str, port: int, timeout: int, bv: binaryninja.binaryview.BinaryView
+) -> None:
+    global G_SERVER, __bv
+    G_SERVER = None
     __bv = bv
 
     for i in range(1):
@@ -99,7 +104,7 @@ def start_service(host: str, port: int, timeout: int, bv: binaryninja.binaryview
         try:
             service = rpyc.utils.helpers.classpartial(BinjaRpycService, bv)
 
-            g_Server = rpyc.utils.server.ThreadedServer(
+            G_SERVER = rpyc.utils.server.ThreadedServer(
                 service(),
                 hostname=host,
                 port=p,
@@ -109,34 +114,37 @@ def start_service(host: str, port: int, timeout: int, bv: binaryninja.binaryview
                     "allow_getattr": True,
                     "allow_setattr": True,
                     "allow_delattr": True,
+                    "allow_pickle": True,
                     "sync_request_timeout": timeout,
                 },
             )
             break
         except OSError as e:
             err(f"OSError: {str(e)}")
-            g_Server = None
+            G_SERVER = None
 
-    if not g_Server:
-        err("failed to start server...")
+    if not G_SERVER:
+        err("failed to start server!")
         return
 
     info("server successfully started")
-    g_Server.start()
+    G_SERVER.start()
     return
 
 
 def rpyc_start(bv: Optional[binaryninja.binaryview.BinaryView] = None) -> None:
-    global g_ServiceThread
+    global G_SERVICETHREAD
     dbg("Starting background service...")
     settings = binaryninja.Settings()
     host: str = settings.get_string(f"{SERVICE_NAME}.{SETTING_RPYC_HOST}")
     port: int = settings.get_integer(f"{SERVICE_NAME}.{SETTING_RPYC_PORT}")
     timeout: int = settings.get_integer(f"{SERVICE_NAME}.{SETTING_RPYC_TIMEOUT}")
 
-    g_ServiceThread = threading.Thread(target=start_service, args=(host, port, timeout, bv))
-    g_ServiceThread.daemon = True
-    g_ServiceThread.start()
+    G_SERVICETHREAD = threading.Thread(
+        target=start_service, args=(host, port, timeout, bv)
+    )
+    G_SERVICETHREAD.daemon = True
+    G_SERVICETHREAD.start()
     info(f"{SERVICE_NAME} successfully started in background")
     # binaryninja.show_message_box(
     #     SERVICE_NAME,
@@ -148,13 +156,13 @@ def rpyc_start(bv: Optional[binaryninja.binaryview.BinaryView] = None) -> None:
 
 
 def shutdown_service() -> bool:
-    if g_Server is None:
+    if G_SERVER is None:
         err("Server is not running (Service not started?)")
         return False
 
     try:
         dbg("Shutting down service")
-        g_Server.close()
+        G_SERVER.close()
         info("Service successfully shutdown")
     except Exception as e:
         err(f"Exception: {str(e)}")
@@ -164,15 +172,15 @@ def shutdown_service() -> bool:
 
 def stop_service() -> bool:
     """Stopping the service"""
-    global g_ServiceThread
-    if g_ServiceThread is None:
+    global G_SERVICETHREAD
+    if G_SERVICETHREAD is None:
         err("Thread is None (Service not started?)")
         return False
 
     dbg("Stopping service thread")
     if shutdown_service():
-        g_ServiceThread.join()
-        g_ServiceThread = None
+        G_SERVICETHREAD.join()
+        G_SERVICETHREAD = None
         info("Service thread stopped")
     else:
         err("Error while shutting down service")
