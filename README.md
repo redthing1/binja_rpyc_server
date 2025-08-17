@@ -38,11 +38,15 @@ def get_hlil_text(func):
 
     lvo = LinearViewObject.single_function_hlil(func, settings)
     lines = []
-    hlil_text = ""
     cursor = lvo.cursor
     while cursor.valid:
         lines.extend(cursor.lines)
         if not cursor.next(): break
+
+    hlil_text = ""
+    addr_width = func.arch.address_size * 2
+    for line in lines:
+        hlil_text += f"{line.contents.address:0{addr_width}x}\t{str(line)}\n"
 
     return hlil_text.strip()
 
