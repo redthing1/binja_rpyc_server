@@ -84,6 +84,7 @@ class BinjaRpycService(rpyc.Service):
 
 def is_service_started():
     global g_ServiceThread
+    dbg(f"checking is_service_started, g_ServiceThread: {g_ServiceThread}")
     return g_ServiceThread is not None
 
 
