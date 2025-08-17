@@ -1,5 +1,6 @@
 """ """
 
+import json
 import sys
 import threading
 import importlib
@@ -7,7 +8,7 @@ import rpyc
 import rpyc.utils.helpers
 import rpyc.utils.server
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Any
 
 import binaryninja  # type: ignore
 
@@ -84,6 +85,33 @@ class BinjaRpycService(rpyc.Service):
 
     def exposed_add_to_syspath(self, path):
         return sys.path.append(path)
+
+    # - utilities
+
+    # source: Union[str, bytes, bytearray, 'databuffer.DataBuffer', 'os.PathLike', 'BinaryView', 'project.ProjectFile'], update_analysis: bool = True,
+    #     progress_func: Optional[ProgressFuncType] = None, options: Mapping[str, Any] = {}
+    def exposed_binaryview_load(
+        self,
+        source: Any,
+        update_analysis: bool = True,
+        options_json: Optional[str] = None,
+    ) -> Any:
+        # wrap options dict
+        options = {}
+        if options_json is not None:
+            options = json.loads(options_json)
+
+        dbg(f"exposed_binaryview_load: source={source}, options={options}")
+
+        # bv = binaryninja.BinaryView.load(
+        bv = binaryninja.load(
+            source,
+            update_analysis=update_analysis,
+            options=options,
+        )
+        dbg(f"exposed_binaryview_load: loaded bv={bv}")
+
+        return bv
 
 
 def is_service_started():

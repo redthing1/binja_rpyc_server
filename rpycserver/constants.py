@@ -12,7 +12,7 @@ SERVICE_DESCRIPTION: str = "Use RPyC to control Binary Ninja headlessly"
 """
 Change to True to enable debug messages
 """
-DEBUG: bool = False
+DEBUG: bool = True
 
 """
 The IPv4 host address to listen on
