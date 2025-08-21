@@ -79,6 +79,9 @@ class BinjaRpycService(rpyc.Service):
 
     def exposed_eval(self, cmd):
         return eval(cmd)
+    
+    def exposed_exec(self, cmd):
+        return exec(cmd)
 
     def exposed_import_module(self, mod):
         return importlib.import_module(mod)
