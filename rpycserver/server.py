@@ -119,7 +119,7 @@ class BinjaRpycService(rpyc.Service):
 
 def is_service_started():
     global G_SERVICETHREAD
-    dbg(f"is_service_started: checking g_servicethread={G_SERVICETHREAD}")
+    # dbg(f"is_service_started: checking g_servicethread={G_SERVICETHREAD}")
     return G_SERVICETHREAD is not None
 
 
