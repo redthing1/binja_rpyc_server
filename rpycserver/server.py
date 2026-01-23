@@ -4,6 +4,9 @@ import json
 import sys
 import threading
 import importlib
+import io
+import traceback
+from contextlib import redirect_stdout, redirect_stderr
 import rpyc
 import rpyc.utils.helpers
 import rpyc.utils.server
@@ -62,6 +65,13 @@ class BinjaRpycService(rpyc.Service):
 
     def __init__(self, bv):
         self.bv = bv
+        self._globals = {
+            "__name__": "__bn_rpyc__",
+            "__file__": None,
+            "__package__": None,
+            "binaryninja": binaryninja,
+            "bv": bv,
+        }
         return
 
     def on_connect(self, conn: rpyc.core.protocol.Connection):
@@ -78,16 +88,64 @@ class BinjaRpycService(rpyc.Service):
         return self.bv
 
     def exposed_eval(self, cmd):
-        return eval(cmd)
-    
+        return eval(cmd, self._globals)
+
     def exposed_exec(self, cmd):
-        return exec(cmd)
+        exec(cmd, self._globals)
+        return True
 
     def exposed_import_module(self, mod):
         return importlib.import_module(mod)
 
     def exposed_add_to_syspath(self, path):
         return sys.path.append(path)
+
+    def exposed_reset_globals(self):
+        self._globals = {
+            "__name__": "__bn_rpyc__",
+            "__file__": None,
+            "__package__": None,
+            "binaryninja": binaryninja,
+            "bv": self.bv,
+        }
+        return True
+
+    def exposed_run_file(self, path, argv=None, capture_output=True):
+        argv = argv or []
+        g = self._globals
+        g["__file__"] = path
+        g["__name__"] = "__main__"
+        g["__package__"] = None
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        old_argv = sys.argv
+        sys.argv = [path] + list(argv)
+        try:
+            if capture_output:
+                with redirect_stdout(stdout), redirect_stderr(stderr):
+                    with open(path, "r", encoding="utf-8") as fh:
+                        source = fh.read()
+                    exec(compile(source, path, "exec"), g, g)
+            else:
+                with open(path, "r", encoding="utf-8") as fh:
+                    source = fh.read()
+                exec(compile(source, path, "exec"), g, g)
+            return {
+                "ok": True,
+                "stdout": stdout.getvalue(),
+                "stderr": stderr.getvalue(),
+                "result": g.get("__result__"),
+            }
+        except Exception:
+            return {
+                "ok": False,
+                "stdout": stdout.getvalue(),
+                "stderr": stderr.getvalue(),
+                "error": traceback.format_exc(),
+            }
+        finally:
+            sys.argv = old_argv
 
     # - utilities
 
