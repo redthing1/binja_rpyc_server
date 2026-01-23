@@ -137,6 +137,19 @@ class BinjaRpycService(rpyc.Service):
                 "stderr": stderr.getvalue(),
                 "result": g.get("__result__"),
             }
+        except SystemExit as exc:
+            code = exc.code
+            ok = code in (0, None)
+            payload = {
+                "ok": ok,
+                "stdout": stdout.getvalue(),
+                "stderr": stderr.getvalue(),
+                "result": g.get("__result__"),
+                "exit_code": code,
+            }
+            if not ok:
+                payload["error"] = f"SystemExit({code})"
+            return payload
         except Exception:
             return {
                 "ok": False,
